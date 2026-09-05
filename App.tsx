@@ -1,26 +1,20 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, SafeAreaView, StyleSheet, Text, TextInput, Vibration, View } from "react-native";
+import { useAudioPlayer } from "expo-audio";
 
 type Phase = "WORK" | "REST";
 const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-
-function beep() {
-  Vibration.vibrate([0, 180, 100, 180]);
-  const C = (globalThis as any).AudioContext || (globalThis as any).webkitAudioContext;
-  if (!C) return;
-  const c = new C(), o = c.createOscillator(), g = c.createGain();
-  o.frequency.value = 880; g.gain.setValueAtTime(0.18, c.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.35);
-  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime + 0.35);
-}
 
 export default function App() {
   const [work, setWork] = useState("30"), [rest, setRest] = useState("15"), [rounds, setRounds] = useState("8");
   const [phase, setPhase] = useState<Phase>("WORK"), [round, setRound] = useState(1);
   const [left, setLeft] = useState(30), [running, setRunning] = useState(false), [finished, setFinished] = useState(false);
   const end = useRef<number | null>(null);
+  const intervalSound = useAudioPlayer(require("./assets/beep.wav"));
   const w = Math.max(1, Number(work) || 30), r = Math.max(1, Number(rest) || 15), total = Math.max(1, Number(rounds) || 8);
+
+  const playIntervalSound = () => { Vibration.vibrate([0, 180, 100, 180]); intervalSound.seekTo(0); intervalSound.play(); };
 
   useEffect(() => {
     if (!running) return;
@@ -28,13 +22,13 @@ export default function App() {
       const next = Math.max(0, Math.ceil(((end.current ?? Date.now()) - Date.now()) / 1000));
       setLeft(next);
       if (next !== 0) return;
-      beep();
+      playIntervalSound();
       if (phase === "WORK" && round < total) { setPhase("REST"); setLeft(r); end.current = Date.now() + r * 1000; }
       else if (phase === "REST" && round < total) { setRound(x => x + 1); setPhase("WORK"); setLeft(w); end.current = Date.now() + w * 1000; }
       else { setRunning(false); setFinished(true); end.current = null; }
     }, 200);
     return () => clearInterval(id);
-  }, [running, phase, round, total, w, r]);
+  }, [running, phase, round, total, w, r, playIntervalSound]);
 
   const reset = () => { end.current = null; setRunning(false); setFinished(false); setPhase("WORK"); setRound(1); setLeft(w); };
   const start = () => { if (finished) reset(); end.current = Date.now() + left * 1000; setFinished(false); setRunning(true); };
