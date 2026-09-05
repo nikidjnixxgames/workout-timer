@@ -11,27 +11,42 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>("WORK"), [round, setRound] = useState(1);
   const [left, setLeft] = useState(30), [running, setRunning] = useState(false), [finished, setFinished] = useState(false);
   const end = useRef<number | null>(null);
-  const intervalSound = useAudioPlayer(require("./assets/beep.wav"));
+  const workCountdownSound = useAudioPlayer(require("./assets/work-countdown.wav"));
+  const restCountdownSound = useAudioPlayer(require("./assets/rest-countdown.wav"));
+  const workEndSound = useAudioPlayer(require("./assets/work-end.wav"));
+  const restEndSound = useAudioPlayer(require("./assets/rest-end.wav"));
+  const lastAnnounced = useRef<number | null>(null);
   const w = Math.max(1, Number(work) || 30), r = Math.max(1, Number(rest) || 15), total = Math.max(1, Number(rounds) || 8);
 
-  const playIntervalSound = useCallback(() => { Vibration.vibrate([0, 180, 100, 180]); intervalSound.seekTo(0); intervalSound.play(); }, [intervalSound]);
+  const playSound = useCallback((player: any, vibration: number | number[]) => {
+    Vibration.vibrate(vibration);
+    player.seekTo(0);
+    player.play();
+  }, []);
 
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
       const next = Math.max(0, Math.ceil(((end.current ?? Date.now()) - Date.now()) / 1000));
       setLeft(next);
+      if (next !== lastAnnounced.current) {
+        lastAnnounced.current = next;
+        if (next >= 1 && next <= 3) {
+          playSound(phase === "WORK" ? workCountdownSound : restCountdownSound, 80);
+        }
+      }
       if (next !== 0) return;
-      playIntervalSound();
+      lastAnnounced.current = null;
+      playSound(phase === "WORK" ? workEndSound : restEndSound, [0, 220, 100, 220]);
       if (phase === "WORK" && round < total) { setPhase("REST"); setLeft(r); end.current = Date.now() + r * 1000; }
       else if (phase === "REST" && round < total) { setRound(x => x + 1); setPhase("WORK"); setLeft(w); end.current = Date.now() + w * 1000; }
       else { setRunning(false); setFinished(true); end.current = null; }
     }, 200);
     return () => clearInterval(id);
-  }, [running, phase, round, total, w, r, playIntervalSound]);
+  }, [running, phase, round, total, w, r, playSound, workCountdownSound, restCountdownSound, workEndSound, restEndSound]);
 
-  const reset = () => { end.current = null; setRunning(false); setFinished(false); setPhase("WORK"); setRound(1); setLeft(w); };
-  const start = () => { if (finished) reset(); end.current = Date.now() + left * 1000; setFinished(false); setRunning(true); };
+  const reset = () => { lastAnnounced.current = null; end.current = null; setRunning(false); setFinished(false); setPhase("WORK"); setRound(1); setLeft(w); };
+  const start = () => { lastAnnounced.current = null; if (finished) reset(); end.current = Date.now() + left * 1000; setFinished(false); setRunning(true); };
 
   return <SafeAreaView style={styles.safe}><StatusBar style="light" /><View style={styles.container}>
     <Text style={styles.title}>Workout Timer</Text>
