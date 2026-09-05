@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, SafeAreaView, StyleSheet, Text, TextInput, Vibration, View } from "react-native";
 import { useAudioPlayer } from "expo-audio";
 
@@ -14,7 +14,7 @@ export default function App() {
   const intervalSound = useAudioPlayer(require("./assets/beep.wav"));
   const w = Math.max(1, Number(work) || 30), r = Math.max(1, Number(rest) || 15), total = Math.max(1, Number(rounds) || 8);
 
-  const playIntervalSound = () => { Vibration.vibrate([0, 180, 100, 180]); intervalSound.seekTo(0); intervalSound.play(); };
+  const playIntervalSound = useCallback(() => { Vibration.vibrate([0, 180, 100, 180]); intervalSound.seekTo(0); intervalSound.play(); }, [intervalSound]);
 
   useEffect(() => {
     if (!running) return;
